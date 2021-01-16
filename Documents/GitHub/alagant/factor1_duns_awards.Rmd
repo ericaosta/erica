@@ -1,0 +1,476 @@
+---
+title: "Factor 1"
+author: "Erica Osta"
+date: "1/14/2021"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r packages}
+# Load required packages
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(writexl)
+library(readr)
+library(readxl)
+#library(fuzzyjoin) # use TBD
+```
+
+
+
+## Prepare environment
+```{r load or assign required data}
+# Read xlsl file with cmmi data
+cmmi <- read_excel("cmmi_2021_sam_ML3_ML4_ML5_world.xlsx")
+
+# Read csv file with awards data from FY21; plan to directly unzip and load from url in the future. 
+url_awards_fy21 <- "https://files.usaspending.gov/generated_downloads/PrimeAwardSummariesAndSubawards_2021-01-14_H05M14S15472571.zip"
+download.file(url_awards_fy21, "awards_fy21.zip")
+unzip("awards_fy21.zip")
+awards_fy21 <- read_csv("Contracts_PrimeAwardSummaries_2021-01-14_H05M14S17_1.csv")
+
+# country names for companies from CMMI list; had to be manually collected as a proof-of-concept for future analyses
+country <- list(
+  "AASKI Technologies (A Mag Aerospace Company)" = "USA", 
+  "Adams Communication & Engineering Technology, Inc."= "USA",
+  "Aselsan MGEO(Aselsan MGEO)" = "Turkey",
+  "Avante Codeworx Private Limited" = "India",
+  "Axle Informatics, LLC" = "USA",
+  "BAE Systems Electronic Systems" = "USA, UK, Canada, Israel",
+  "Boeing India Private Limited (English)" = "India",
+  "Centauri" = "USA",
+  "Changeis, Inc." = "USA",
+  "China Eastern Airlines Corporation Limited" = "China",
+  "China Post Information Technology" = "China",
+  "Client Network Services India Pvt Ltd" = "USA, India",
+  "Cole Engineering Services, Inc." = "USA",
+  "CompQsoft, Inc." = "USA",
+  "Concentrix Services Pvt. Ltd." = "USA, India",
+  "Dovel Technologies, LLC" = "USA",
+  "Dynamik Technologies Sdn Bhd" = "Brunei",
+  "Earth Resources Technology, Inc. (ERT)" = "USA",
+  "ECS Federal, LLC" = "USA",
+  "Efftronics Systems Private Limited" = "India",
+  "ESEN SYSTEMS INTEGRATION" = "Turkey",
+  "Evergrande life insurance Co., Ltd." = "China",
+  "Evolver Inc." = "USA",
+  "Guangdong Oriental Thought Co., Ltd." = "China",
+  "Highlight Technologies, LLC." = "USA",
+  "Holostik India Limited" = "India",
+  "Housing & Development Board (HDB)" = "Singapure",
+  "IEM" = "USA",
+  "IERUS Technologies, Inc." = "USA",
+  "Indra Sistemas S.A." = "USA, Spain, others", 
+  "Industrias Lior S.A. de C.V." = "Mexico",
+  "Info Gain Consulting LLC" = "USA", 
+  "Inserso Corporation" = "USA",
+  "Integra Micro Software Services Private Limited" = "India, USA, Singapore",
+  "Invictus International Consulting" = "USA",
+  "Ison Technologies Private Limited" = "India",
+  "JYG Innovations, LLC." = "USA", 
+  "KPMG Advisory Services Private Limited" = "India",
+  "Leonardo DRS" = "USA",
+  "Mercer Engineering Research Center (MERC)" = "USA",
+  "Metis Technology Solutions, Inc." = "USA",
+  "MicroGenesis Techsoft Pvt Ltd" = "India",
+  "Next Tier Concepts, Inc." = "USA",
+  "Nextchip Co.,Ltd." = "Korea",
+  "Primestone S.A.S.(Primestone S.A.S.)" = "USA",
+  "Pumex Computing, LLC." = "USA",
+  "QA InfoTech Software Services Private Limited" = "India, USA, Canada",
+  "Quality Innovation, Inc." = "USA",
+  "RiVi Consulting Group LLC" = "USA, India",
+  "Ryan Consulting Group" = "USA",
+  "Samin TekMindz India Private Limited" = "India",
+  "Sansec Technology Co., Ltd." = "China",
+  "SEV1Tech LLC" = "USA",
+  "SICPA S.A." = "Switzerland",
+  "Southwest Research Institute" = "USA",
+  "SVAM International Incorporated" = "USA, Mexico, India",
+  "Swain Techs" = "USA",
+  "Technica Corporation" = "USA",
+  "Teradyne" = "USA",
+  "Trigent Solutions Inc." = "USA",
+  "UNISYS, S. L. U." = "USA, Spain",
+  "VariQ Corporation" = "USA",
+  "Vectrus Mission Solutions Corporation" = "USA",
+  "Aderas, Inc." = "USA",
+  "Alion Science and Technology Corporation" = "USA",
+  "Unisoc (Shanghai) Technologies Co., Ltd" = "China",
+  "Beijing Join-Cheer Government Software Co., Ltd." = "China",
+  "Beijing Join-Cheer Software Co., LTD." = "China",
+  "Beijing Sifang Automation Co., Ltd." = "China",
+  "Beijing Sifang Engineering Co., Ltd." = "China",
+  "China Telecom System Integration Co., Ltd" = "China",
+  "General Atomics Aeronautical Systems Inc." = "USA",
+  "Hanwha Systems" = "Korea",
+  "Hewlett Packard Enterprise Co., Ltd." = "China, others",
+  "MAXIMUS Federal Services" = "USA",
+  "National Government Services, Inc." = "USA",
+  "Riptide Software Inc." = "USA",
+  "SoftManagement S.A." = "Colombia",
+  "Tata Consultancy Services Limited" = "India",
+  "Wipro Limited" = "India",
+  "Yash Technologies Pvt. Ltd." = "USA")
+
+```
+
+
+
+## Clean for DUNS from awards data, clean company names with regex
+```{r}
+
+# Original file has >200 columns. Select 'recipient_name', 'award description', 'recipient_duns', 'naics_code', 'naics_description', 'cage_code', 'recipient_parent_name', 'recipient_parent_duns', 'recipient_country_name' columns to simplify straightforward analysis
+awards_fy21_select <- awards_fy21  %>%
+   dplyr::select(recipient_name, award_description, recipient_duns, naics_code, naics_description, cage_code, recipient_parent_name, recipient_parent_duns, recipient_country_name)
+
+# Remove duplicate DUNS so there is only one duns per company. In the future, will repeat for fy20-18, merge dataframes by rows, remove duplicates again; assumes duns per company stay the same over time
+duns_fy21 <- awards_fy21_select[!duplicated(awards_fy21_select$recipient_duns),] %>%
+  select(recipient_duns, naics_code, recipient_name, cage_code, recipient_country_name)
+
+# Select only companies in USA
+duns_fy21_usa <- duns_fy21 %>%
+  dplyr::filter(recipient_country_name == "UNITED STATES")
+
+# Save xlsx file with list of companies and corresponding DUNS and other ID info for FY2021
+write_xlsx(duns_fy21_usa, "duns_FY21_USA.xlsx")
+
+# Determine regular expressions ("regex") to "standarize" a pattern between company names. It is important to standarize company names because some website that we will scrap may have company names but not DUNS. Therefore, we can use this tool to analyze government data (e.g., sam.gov, usaspending.gov with other sites, such as cmmiinstitute.com, where we can find companies and their CMMI Level status)
+
+to_remove <- c("\\LLC$",
+               "\\, LLC$", 
+               "\\. Inc.$\\", 
+               "\\. Inc.$", 
+               "\\ INC$", 
+               "\\Inc$", 
+               "\\Co.$", 
+               "\\INC.$", 
+               "\\, INC$",
+               "\\, INC.$",
+               "\\, Inc$",
+               "\\, Inc.$",
+               "\\L.L.C.$", 
+               "\\, L.L.C.$",
+               "\\Corp.$", 
+               "\\Ltd.$",
+               "\\LLC.$",
+               "\\L.LC.$",
+               "\\, L.LC$",
+               "\\L.C.$",
+               "\\Llc$",
+               "\\PLLC$",
+               "\\inc$",
+               "\\, Ltd.$",
+               "\\.$",
+               "\\,$",
+               "\\, Llc$",
+               "\\, PLLC$",
+               "\\#1$",
+               "\\Co$",
+               "\\Corp$",
+               "\\Corporation$",
+               "\\CORPORATION$",
+               "\\Incorporated$",
+               "\\LLP$",
+               "\\CORP.$",
+               "\\, L L C$",
+               "\\CORP$",
+               "\\, inc$",
+               "\\LLLP$",
+               "\\(INC)$",
+               "\\, L.L.L.P$",
+               "\\ LP$",
+               "\\ PC$",
+               " P.C$",
+               "\\LTD$",
+               "\\, LTD$"
+               )
+
+# Standarize company names by removing regex. Note post second-to-last Co. or Corp. will missout companies with names that have Cor|Corp in main name (e.g., TraCorp)
+duns_fy21_usa$x <- gsub(paste(to_remove,collapse="|"),"",duns_fy21_usa$recipient_name) # removes regex
+duns_fy21_usa$x <- gsub("TECHNOLOGY|TECHNOLOGIES","TECH",as.character(duns_fy21_usa$x)) # converts "technology'ies' to "tech"
+duns_fy21_usa$x <- gsub("COMPANIES|COMPANY","CO",as.character(duns_fy21_usa$x)) # converts "company'ies' to "co"
+duns_fy21_usa$y <- gsub(paste(to_remove,collapse="|"),"",duns_fy21_usa$x) # to remove second-to-last terms, such as "Co" before "Inc" in "Co, Inc" and all iterations thereof. 
+
+```
+
+
+
+## Clean CMMI data 
+```{r}
+# Regular expression to standardize company names from CMMI website; just a few more additions to "to_remove" as above.
+to_remove_cmmi <- c("\\LLC$",
+               "\\, LLC$", 
+               "\\. Inc.$\\", 
+               "\\. Inc.$", 
+               "\\ INC$", 
+               "\\Inc$", 
+               "\\Co.$", 
+               "\\INC.$", 
+               "\\, INC$",
+               "\\, INC.$",
+               "\\, Inc$",
+               "\\, Inc.$",
+               "\\L.L.C.$", 
+               "\\, L.L.C.$",
+               "\\Corp.$", 
+               "\\Ltd.$",
+               "\\LLC.$",
+               "\\L.LC.$",
+               "\\, L.LC$",
+               "\\L.C.$",
+               "\\Llc$",
+               "\\PLLC$",
+               "\\inc$",
+               "\\, Ltd.$",
+               "\\.$",
+               "\\,$",
+               "\\, Llc$",
+               "\\, PLLC$",
+               "\\#1$",
+               "\\Co$",
+               "\\Corp$",
+               "\\Corporation$",
+               "\\CORPORATION$",
+               "\\Incorporated$",
+               "\\LLP$",
+               "\\CORP.$",
+               "\\, L L C$",
+               "\\CORP$",
+               "\\, inc$",
+               "\\LLLP$",
+               "\\(INC)$",
+               "\\, L.L.L.P$",
+               "\\ LP$",
+               "\\ PC$",
+               " P.C$",
+               "\\LTD$",
+               "\\, LTD$",
+               "\\s*\\([^\\)]+\\)",
+               "\\Pvt Ltd",
+               "\\Pvt.",
+               "Private Limited",
+               "S.A.$",
+               "S.A. de C.V",
+               "S. A",
+               "Pvt.$",
+               "S.A.S",
+               "\\, LTD",
+               "\\, Ltd",
+               "\\Limited$",
+               ",.*"
+               )
+
+# Standarize company names; use touper() to convert character strings to uppercase
+
+cmmi$x <- gsub(paste(to_remove_cmmi,collapse="|"),"",as.character(cmmi$org))
+cmmi$x <- toupper(gsub("Technologies|Technology","Tech",as.character(cmmi$x)))
+cmmi$x <- toupper(gsub("Companies|Company","Co",as.character(cmmi$x)))
+cmmi$x <- toupper(gsub("BAE SYSTEMS ELECTRONIC SYSTEMS","BAE SYSTEMS INFORMATION AND ELECTRONIC SYSTEMS INTEGRATION ",as.character(cmmi$x))) # a specific modification to a company name
+cmmi$y <- toupper(gsub(paste(to_remove_cmmi,collapse="|"),"",as.character(cmmi$x)))
+
+# Select USA-only companies from CMMI list. The 'country' list manually generated after the list of 82-row table of CMMI Level >=3 and SAM+ companies was generated. Next time, I can specific USA-only companies on the CMMI website prior to scraping. 
+countries <- as.data.frame(unlist(country)) 
+countries$Names <- rownames(countries)
+countries$x <- gsub(paste(to_remove_cmmi,collapse="|"),"",as.character(countries$Name))
+countries$x <- toupper(gsub("Technologies|Technology","Tech",as.character(countries$x)))
+countries$x <- toupper(gsub("Companies|Company","Co",as.character(countries$x)))
+countries$x <- toupper(gsub("BAE SYSTEMS ELECTRONIC SYSTEMS","BAE SYSTEMS INFORMATION AND ELECTRONIC SYSTEMS INTEGRATION ",as.character(countries$x)))
+countries$y <- toupper(gsub(paste(to_remove_cmmi,collapse="|"),"",as.character(countries$x)))
+
+# Inner join
+countries_cmmi <- inner_join(countries, cmmi, by="y", suffix=c("_countries","_cmmi"))
+countries_cmmi_anti <- anti_join(countries, cmmi, by="y", suffix=c("_countries","_cmmi"))
+countries_select <- countries_cmmi %>%
+  filter(`unlist(country)` == "USA") %>%
+  select(`unlist(country)`, Names, y, sam_status, level_status)
+colnames(countries_select) <- c("country", "Name", "y", "sam_status", "level_status")
+
+```
+
+
+
+## Join CCMI data to DUNS to assign DUNS to CMMI-filtered companies
+```{r}
+
+# Inner join companies from CMMI list ('cmmi') and DUNS list FY21 ('). Each row represents a unique DUNS. It seems like one company can have multiple DUNS. 
+
+# cmmi ML3 >=3 and SAM in USA
+cmmi_duns_usa <- inner_join(countries_select, duns_fy21_usa, by="y", suffix=c("_cmmi","_duns")) # matched
+anti_cmmi_duns_usa <- anti_join(countries_select, duns_fy21_usa, by="y", suffix=c("_cmmi","_duns")) # unmatched
+
+# There are a total of 27 unique companies from CMMI matched to their DUNS. Success rate of approach = 27/41 = 66% (out of total unique companies from 'countries_select'). Improving the regex and adding DUNS from previous fiscal years could increase the success rate of matching DUNS from usaspending.gov to data from scraped websites such as cmmiinstitute.com
+unique(cmmi_duns_usa$Name)
+
+```
+
+
+
+## Join CMMI data to awards data by DUNS
+```{r}
+
+# Award in USA for companies with cmmi and select only relevant columns, such as award_description, recipient_duns, naics_code, naics_description
+cmmi_duns_award <- inner_join(cmmi_duns_usa, awards_fy21_select, by="recipient_duns", suffix = c("_cmmi","_award"))
+cmmi_duns_award_select <- dplyr::select(cmmi_duns_award, y, award_description, recipient_duns, naics_code_cmmi, naics_description, sam_status, level_status, cage_code_cmmi)
+
+# consider filtering instead of 5182|518210
+
+colnames(cmmi_duns_award_select) = c("company_name","award_description","recipient_duns","naics_code", "naics_description", "sam_status", "cmmi_level", "cage_code")
+
+```
+
+
+
+## Visualize awards data (optional)
+```{r}
+
+library(ggplot2)
+library(plotly)
+
+cmmi_duns_award_select$naics_code <- as.character(cmmi_duns_award_select$naics_code)
+
+p <- ggplot(cmmi_duns_award_select, aes(y = naics_code, x = company_name, colour = company_name, group=naics_code)) +
+  geom_count(alpha=1) +
+  labs(title = "Filtered Companies and NAICS Codes",
+       x = "Company Names",
+       y = "NAICS Code",
+       size = ""
+       )
+
+l <- ggplotly(p)
+
+htmlwidgets::saveWidget(l, "awards.html")
+
+# Note: Could try to determine weighted impact of  companies vs. naics code per award prevalence to determine top hits as in fgsea()
+
+```
+
+
+## Trends in award descriptions based on NAICS (Optional)
+```{r}
+
+# Optional
+naics_groups <- cmmi_duns_award_select %>%
+  dplyr::group_by(naics_description)
+
+```
+
+
+## CLOUD
+```{r}
+award_terms <- awards_fy21_select
+
+# CLOUD
+award_terms$cloud_status <- ifelse(grepl("cloud",awards_fy21_select$award_description),'cloud',
+                         ifelse(grepl("CLOUD", awards_fy21_select$award_description), 'cloud', 'something_else'))
+
+award_cloud_usa <- award_terms %>%
+  dplyr::filter(cloud_status == "cloud", recipient_country_name == "UNITED STATES")
+
+# Optional
+## Plot to determine correlation between "cloud" in description and NAICS description
+ggplot(award_cloud_usa, aes(y = naics_description, x = recipient_name)) + geom_point()
+
+## Plot to determine correlation between "cloud" in description and NAICS code
+ggplot(award_cloud_usa, aes(y = as.character(naics_code), x = recipient_name)) + geom_point()
+```
+
+> Note: Awards containing the word "cloud" are more likely to have NAICS related to "OTHER COMPUTER RELATED SERVICES" and code 541519. 
+
+
+
+## ORACLE
+```{r}
+
+award_terms$oracle_status <- ifelse(grepl("oracle",awards_fy21_select$award_description),'oracle',
+                         ifelse(grepl("ORACLE", awards_fy21_select$award_description), 'oracle', 'something_else'))
+
+award_oracle_usa <- award_terms %>%
+  dplyr::filter(oracle_status == "oracle", recipient_country_name == "UNITED STATES")
+
+# Optional
+## Plot to determine correlation between "oracle" in description and NAICS description; it is "OTHER COMPUTER RELATED SERVICES"
+ggplot(award_oracle_usa, aes(y = naics_description, x = recipient_name)) + geom_point()
+
+## Plot to determine correlation between "oracle" in description and NAICS code; it is "541519"
+ggplot(award_oracle_usa, aes(y = as.character(naics_code), x = recipient_name)) + geom_point()
+```
+
+
+
+## UFMS
+```{r}
+# UFMS
+award_terms$ufms_status <- ifelse(grepl("ufms",awards_fy21_select$award_description),'ufms',
+                                  ifelse(grepl("UFMS", awards_fy21_select$award_description), 'ufms', 
+                                         ifelse(grepl("ORACLE FINANCIAL", awards_fy21_select$award_description), 'ufms', 'something_else')))
+
+award_ufms_usa <- award_terms %>%
+  dplyr::filter(ufms_status == "ufms", recipient_country_name == "UNITED STATES")
+
+# At least 3 awards/projects involving UFMS, Oracle Financial, etc. 
+award_ufms_usa_3 <- award_ufms_usa %>%
+  dplyr::count(recipient_duns) %>%
+  dplyr::filter(n >= 3) %>%
+  dplyr::inner_join(award_ufms_usa, by="recipient_duns")
+
+award_ufms_usa_3 <- award_ufms_usa_3[!duplicated(award_ufms_usa_3$recipient_duns),]
+  
+write_xlsx(award_ufms_usa_3, "award_ufms_usa_3.xlsx")
+
+# Optional
+## Plot to determine correlation between "UFMS" in description and NAICS description; it is "OTHER COMPUTER RELATED SERVICES"
+ggplot(award_ufms_usa, aes(y = naics_description, x = recipient_name)) + geom_point()
+
+## Plot to determine correlation between "UFMS" in description and NAICS code; it is "541519"
+ggplot(award_ufms_usa, aes(y = as.character(naics_code), x = recipient_name)) + geom_point()
+```
+
+> [CGI FEDERAL INC.](https://www.cgi.com/us/en-us/federal/about-cgi-federal) is CMMI-SVC ML3 and ISO 9001:2015 certified. Therefore, the best approach is to start with the most stringent criteria first. The likelihood of meeting more basic criteria (e.g., CMMI Level 3 and up, ISO 9001:2015) increases when more stringent criteria (UFMS, Oracle Financials, etc.) are met. 
+> INTEGRATED MEDICAL SOLUTIONS, INC
+
+
+
+## CLOUD::MIGRAT and CLOUD::TRANSFORMATION
+```{r}
+## CLOUD::MIGRAT and ::TRANSFORMATION
+
+# Search for words containing "migrat" and "transfo" within the "cloud"-containing awards and create a new column that designates the "migration" or "transformation" status of the award description. 
+award_cloud_usa$migration_status <- ifelse(grepl("migrat",award_cloud_usa$award_description),'migration',
+                         ifelse(grepl("MIGRAT", award_cloud_usa$award_description), 'migration', 'something_else'))
+
+award_cloud_usa$transformation_status <- ifelse(grepl("transfo",award_cloud_usa$award_description),'transformation',
+                         ifelse(grepl("TRANSFO", award_cloud_usa$award_description), 'transformation', 'something_else'))
+
+# Select awards that contain the words "migration" or "transformation"
+award_cloud_migration <- award_cloud_usa %>%
+  dplyr::filter(migration_status == "migration")
+
+award_cloud_transformation <- award_cloud_usa %>%
+  dplyr::filter(transformation_status == "transformation")
+
+# Combine both "migration" and "transformation" hits
+award_cloud_migration_transformation <- rbind(award_cloud_migration, award_cloud_transformation)
+
+# At least 2 awards/projects involving cloud migration/transformation
+award_cloud_migration_transformation_2 <- award_cloud_migration_transformation %>%
+   dplyr::count(recipient_duns) %>%
+  dplyr::filter(n >= 2) %>%
+  dplyr::inner_join(award_cloud_migration_transformation, by="recipient_duns")
+
+award_cloud_migration_transformation_2 <- award_cloud_migration_transformation_2[!duplicated(award_cloud_migration_transformation_2$recipient_duns),]
+
+# Export to Excel
+write_xlsx(award_cloud_migration_transformation_2, "award_cloud_migration_transformation_2.xlsx")
+```
+
+> [BUSINESS INFORMATION TECHNOLOGY SOLUTIONS LLC](https://cognosante.com/our-company/certifications-contract-vehicles/) is CMMI-SVC ML3 and ISO 9001:2015 certified. Therefore, the best approach is to start with the most stringent criteria first. The likelihood of meeting more basic criteria (e.g., CMMI Level 3 and up, ISO 9001:2015) increases when more stringent criteria (cloud migration/transformation, etc.) are met.  
+
+

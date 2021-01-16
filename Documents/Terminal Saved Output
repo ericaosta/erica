@@ -1,0 +1,67 @@
+Last login: Wed Sep 16 17:22:48 on ttys000
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+ericas-mbp:~ erica$ git clone https://github.com/HGNC/get-gene-info.git
+Cloning into 'get-gene-info'...
+remote: Enumerating objects: 48, done.
+remote: Total 48 (delta 0), reused 0 (delta 0), pack-reused 48
+Unpacking objects: 100% (48/48), 9.90 KiB | 375.00 KiB/s, done.
+ericas-mbp:~ erica$ ls
+Applications
+BroadPeak.tar.gz
+DESeq2_1.12.4.tar.gz
+DESeq2_1.14.1.tar.gz
+Desktop
+Documents
+Downloads
+GDCdata
+Library
+MANIFEST.txt
+Movies
+Music
+Pictures
+Public
+README.md
+SurfCyto PDL1 B16 endocytosis top 10 hits.tiff
+get-gene-info
+limma_res.RDS
+nrstats_0.1.0.tar.gz
+scRNAseq_Jerby-Arnon
+surfcyto pdl1 b16 endocytosis.tiff
+tcga_data.RDS
+ericas-mbp:~ erica$ cd
+ericas-mbp:~ erica$ cd get-gene-info/
+ericas-mbp:get-gene-info erica$ ls
+README.md		get-gene-info.pl	test.txt
+cpanfile		install.sh
+ericas-mbp:get-gene-info erica$ ./install.sh
+Error: cpanm is not installed. Installing...
+Install cpanm
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 =  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0    0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  100  295k  100  295k    0     0   188k      0  0:00:01  0:00:01 --:--:--  188k
+--> Working on App::cpanminus            =====           
+Fetching http://www.cpan.org/authors/id/M/MI/MIYAGAWA/App-cpanminus-1.7044.tar.gz ... OK
+Configuring App-cpanminus-1.7044 ...                         =====              OK                =====                                
+Building and testing App-cpanminus-1.7044 ...                =====                                                                            =====                                                       =====                                              
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

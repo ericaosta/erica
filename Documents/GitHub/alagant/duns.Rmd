@@ -1,0 +1,36 @@
+---
+title: "duns"
+author: "Erica"
+date: "1/15/2021"
+output: html_document
+---
+
+```{r andrew}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+#library(fuzzyjoin)
+
+# From Andrew; problem... not all DUNS here
+
+duns <- company_unique_list
+duns_select <- duns %>% 
+  tibble() %>% 
+  dplyr::select(Name, DUNS, `DUNS +4`, `CAGE Code`, Country)
+
+cmmi <- cmmi_2021_sam_ML3_ML4_ML5_world
+
+colnames(cmmi) <- c("Name", "sam_status", "cmmi_level", "cmmi_type")
+
+# clean names on duns_select instead; use that as the base for grep; use "to_remove" regex from above 
+
+duns_select$x <- gsub(paste(to_remove,collapse="|"),"",duns_select$Name)
+# post second-to-last Co. or Corp. # Will missout companies with names that have Cor|Corp in main name (e.g., TraCorp)
+duns_select$y <- gsub(paste(to_remove,collapse="|"),"",duns_select$x)
+
+cmmi_duns_ap <- inner_join(cmmi, duns_select, by="y", suffix=c("_cmmi","_duns"))
+anti_cmmi_duns_ap <- anti_join(cmmi, duns_select, by="y", suffix=c("_cmmi","_duns"))
+
+
+
+```

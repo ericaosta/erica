@@ -1,0 +1,15 @@
+Package: nrstats
+Type: Package
+Title: nrstats
+Version: 0.1.0
+Authors@R: person("Nadeem", "Riaz", email = "riazn@mskcc.org", role = c("aut", "cre"))
+Description: Graphs to facilitate Survival and Response Analysis
+License: What license is it under?
+LazyData: TRUE
+RoxygenNote: 5.0.1.9000
+Imports: ggplot2, grid, gridExtra, R.utils, GGally, rms, MASS,
+        survival, cmprsk
+NeedsCompilation: no
+Packaged: 2017-10-10 22:00:13 UTC; riazn
+Author: Nadeem Riaz [aut, cre]
+Maintainer: Nadeem Riaz <riazn@mskcc.org>
